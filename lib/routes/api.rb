@@ -19,6 +19,25 @@ module Rubywarden
     module Api
       def self.registered(app)
         app.namespace BASE_URL do
+          post "/accounts/prelogin" do
+            need_params(:email) do |p|
+              return validation_error("#{p} cannot be blank")
+            end
+
+            kdf_type = User::DEFAULT_KDF_TYPE
+            iterations = Bitwarden::KDF::DEFAULT_ITERATIONS[kdf_type]
+
+            if u = User.find_by_email(params[:email])
+              iterations = u.kdf_iterations
+              kdf_type = Bitwarden::KDF::TYPES[u.kdf_type]
+            end
+
+            {
+              "Kdf" => Bitwarden::KDF::TYPE_IDS[kdf_type],
+              "KdfIterations" => iterations,
+            }.to_json
+          end
+
           # create a new user
           post "/accounts/register" do
             content_type :json
@@ -27,7 +46,7 @@ module Rubywarden
               return validation_error("Signups are not permitted")
             end
 
-            need_params(:masterpasswordhash) do |p|
+            need_params(:masterpasswordhash, :kdf, :kdfiterations) do |p|
               return validation_error("#{p} cannot be blank")
             end
 
@@ -37,6 +56,16 @@ module Rubywarden
 
             if !params[:key].to_s.match(/^0\..+\|.+/)
               return validation_error("Invalid key")
+            end
+
+            kdf_type = Bitwarden::KDF::TYPES[params[:kdf].to_i]
+            if !kdf_type
+              return validation_error("invalid kdf type")
+            end
+
+            if !Bitwarden::KDF::ITERATION_RANGES[kdf_type].
+            include?(params[:kdfiterations].to_i)
+              return validation_error("invalid kdf iterations")
             end
 
             begin
@@ -57,6 +86,8 @@ module Rubywarden
               u.password_hash = params[:masterpasswordhash]
               u.password_hint = params[:masterpasswordhint]
               u.key = params[:key]
+              u.kdf_type = Bitwarden::KDF::TYPE_IDS[kdf_type]
+              u.kdf_iterations = params[:kdfiterations]
 
               # is this supposed to come from somewhere?
               u.culture = "en-US"
