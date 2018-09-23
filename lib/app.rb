@@ -18,10 +18,12 @@ require 'sinatra/activerecord'
 require 'sinatra/namespace'
 
 require_relative 'helpers/request_helpers'
+require_relative 'helpers/attachment_helpers'
 
 require_relative 'routes/api'
 require_relative 'routes/icons'
 require_relative 'routes/identity'
+require_relative 'routes/attachments'
 
 module Rubywarden
   class App < Sinatra::Base
@@ -29,13 +31,13 @@ module Rubywarden
     register Sinatra::ActiveRecordExtension
 
     set :root, File.dirname(__FILE__)
-    set :database_file, "../db/config.yml"
 
     configure do
       enable :logging
     end
 
     helpers Rubywarden::RequestHelpers
+    helpers Rubywarden::AttachmentHelpers
 
     before do
       if request.content_type.to_s.match(/\Aapplication\/json(;|\z)/)
@@ -58,5 +60,6 @@ module Rubywarden
     register Rubywarden::Routing::Api
     register Rubywarden::Routing::Icons
     register Rubywarden::Routing::Identity
+    register Rubywarden::Routing::Attachments
   end
 end
